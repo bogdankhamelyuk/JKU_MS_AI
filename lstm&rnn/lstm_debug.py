@@ -29,7 +29,8 @@ class FullyRecurrentNetwork(object):
             self.a[t] = np.tanh(self.W @ x[t] + self.R @ self.a[t-1])
             
         self.z = model.V @ self.a[t] 
-        return y * f(-self.z) + (1-y) * f(self.z)
+        loss = y * f(-self.z) + (1-y) * f(self.z)
+        return loss
 
 T, D, I, K = 10, 3, 5, 1
 model = FullyRecurrentNetwork(D, I, K)
@@ -79,14 +80,44 @@ print("y shape: ",y.shape)
 #EXERCISE 3
 
 def backward(self):
-    # psi
-    for t in range(T):
-        # define psi for each case
-        pass
-
-
     
+    T = len(self.z)
+    psi = np.zeros(T,)
+    delta = np.zeros(T,)
+    gradR = 0
+    gradW = 0
+    gradV = 0
 
+    for t in reversed(range(0, T)):
+        # calculate psi[t]
+        frac = - self.z[t]/( np.abs(self.z[t]) * (1+np.exp(self.z[t])))
+        if self.z[t] > 0:
+            frac += (1 - self.y)
+        psi[t] = frac
+
+        # calculate s[t] 
+        s_t = self.W @ self.x[t]
+        if t > 0: # avoid out of range for self.a
+            s_t += self.R @ self.a[t-1]
+
+        # calculate delta[t] 
+        dL_da = self.V.T @ [psi[t]]
+        da_ds = 1/(np.cosh(s_t))**2
+        if t != (len(self.z) - 1): # in case we aren't at the beginng and already have t+1 step ahead
+            dL_da += delta[t+1] # so we can add "previous" delta, since we're going from T-1 to 0 
+        delta[t] = dL_da @ da_ds
+    
+    # calculate gradients 
+    for t in range(0, T):
+        #calculate gradR
+        if t!=0:       
+            gradR += delta[t] * self.a[t-1]
+        # calculate gradW
+        gradW += delta[t] * self.x[t]
+        # calculate gradV
+        gradV += psi[t] * self.a[t]
+    
 
 FullyRecurrentNetwork.backward = backward
 model.backward()
+
