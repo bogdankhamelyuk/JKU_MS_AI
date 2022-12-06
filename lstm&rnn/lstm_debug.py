@@ -60,7 +60,7 @@ def generate_data(T):
     y2 = np.array([0.0],dtype=float)
 
     choice = np.random.choice([1,-1],1,p=[0.5,0.5])
-    if choice[0] == 1:
+    if choice[0] == 1: 
         return x1,y1# ,"positive"
          
     else:
