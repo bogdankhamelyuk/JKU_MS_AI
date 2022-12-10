@@ -69,37 +69,46 @@ def generate_data(T):
 
 #EXERCISE 3
 
-def backward(self):
-    
+def backward(self): 
     delta = np.zeros((T,I))
     self.gradR = 0
     self.gradW = 0
     self.gradV = 0
     dL_da = np.zeros((T,I))
+
     
     # calculate psi[t]
-    # Loss formula was directly taken from forward pass 
+    # Loss formula was directly taken from forward pass   #
     psi = - (np.sign(self.z))/(np.exp(np.abs(self.z))+1) \
-          + (np.max([0,self.z])/self.z)*(1-self.y)
+          + (np.max([0,self.z])/self.z)*(1-self.y) 
+    # derivative of the unstable bce loss    
+    # psi = (np.exp(self.z)*(self.y-1)+self.y) / (np.exp(self.z)+1)              
+                                    
 
-    # just before start looping, calculate only one time 
-    # dL_da for the last position using psi, since we won't have psi[t]
+    # just before start looping, calculate dL_da for the last position once using psi,
+    # since we won't have psi[t] anymore
     dL_da[-1] = psi.reshape(1,1) @ self.V
-    
-    # calculate delta[t]:
-    for t in reversed(range(0, T)):
-        
-        # 1) calculate dL/da[t]:
-        if t < (T-1):
-            dL_da[t] += delta[t+1] @ self.R 
-        
-        # 2) calculate da[t]/ds[t] 
-        s_t = self.W @ self.x[t].reshape(D,1)
-        if t > 0: # avoid out of range for self.a
-            s_t += self.R @ self.a[t-1].reshape(I,1)
-        da_ds = np.diag(1/(np.cosh(s_t))**2) 
 
-        delta[t] = dL_da[t].reshape(I,1) @ da_ds 
+    # calculate delta[t]
+    # delta = dL/da * da/ds
+    for t in reversed(range(0, T)):
+
+        # complete dL_da in case we've got already delta[t+1], i.e. we aren't at the end     
+        if t < (T-1): 
+            dL_da[t] += delta[t+1] @ self.R 
+
+        # calculate s_t for diag(f's(t)), i.e. dor da/ds
+        s_t = self.W @ self.x[t].reshape(D,1)
+        # complete s_t for two cases: t>0 and t==0
+        if t > 0:
+            s_t += self.R @ self.a[t-1].reshape(I,1)
+        else:
+            s_t += self.R @ np.zeros_like(self.a[t]).reshape(I,1)
+        # insert s_t into formula, so we have da_ds
+        da_ds = np.diag(1/(np.cosh(s_t))**2)
+        
+        # finally, calculate delta
+        delta[t] = dL_da[t].reshape(I,1) @ da_ds
     
     # calculate gradients 
     for t in range(0, T):
@@ -113,7 +122,7 @@ def backward(self):
             self.gradV += psi[t].reshape(K,K) @ self.a[t].reshape(K,I)
     if len(psi) == 1:
         self.gradV += psi[-1].reshape(K,K) @ self.a[-1].reshape(K,I)
-    
+   
 
 FullyRecurrentNetwork.backward = backward
 model.backward()
@@ -139,10 +148,11 @@ def grad_check(self, eps, thresh):
     lossMinusEps = self.forward(self.x,self.y)
     
     # calculate numerical gradient
-    gradApprox = (lossPlusEps - lossMinusEps)/(2*self.eps)
+    gradApprox = ((lossPlusEps - lossMinusEps)/(2*self.eps))[0]
     
     for row in self.gradV:
         for dV in row:
+            diff = np.abs(gradApprox - dV) 
             diff = np.linalg.norm(gradApprox-dV)/(np.linalg.norm(dV)+np.linalg.norm(gradApprox))
             if diff > self.thresh:
                 print("error")
@@ -167,3 +177,11 @@ def grad_check(self, eps, thresh):
 
 FullyRecurrentNetwork.grad_check = grad_check
 model.grad_check(1e-7, 1e-7)
+
+def update(self, eta):
+    self.W -= eta * self.gradW
+    self.V -= eta * self.gradV
+    self.R -= eta * self.gradR   
+
+FullyRecurrentNetwork.update = update
+model.update(0.001)
