@@ -185,3 +185,39 @@ def update(self, eta):
 
 FullyRecurrentNetwork.update = update
 model.update(0.001)
+
+
+# ex6
+import pandas as pd
+np.random.seed(0xDEADBEEF)
+D,I,K = 3,32,1
+
+model = FullyRecurrentNetwork(D,I,K)
+
+max_epochs = 100
+lr = 0.1
+
+Ts = [1,2,3,4,5,10,15,20]
+losses = []
+
+
+#fig = plt.figure(figsize=(8,3))
+for T in Ts:
+    T_loss = []
+    X = np.random.uniform(-1, 1,(T,D))
+    for epochs in range(max_epochs):
+        T_loss.append(model.forward(X,1)[0])
+        model.backward()
+        model.update(lr)
+    plt.plot(T_loss, label=T)
+    losses.append(T_loss)    
+
+
+plt.xlabel("n epochs")
+plt.ylabel("Losses")
+
+plt.legend()
+plt.axis([0, max_epochs, 0, 0.8])
+# function to show the plot
+plt.show()
+pass
