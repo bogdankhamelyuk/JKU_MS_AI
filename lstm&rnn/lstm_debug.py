@@ -205,6 +205,7 @@ losses = []
 for T in Ts:
     T_loss = []
     X = np.random.uniform(-1, 1,(T,D))
+    y = np.random.choice([1,0],1,p=[0.5,0.5])[0]
     for epochs in range(max_epochs):
         T_loss.append(model.forward(X,1)[0])
         model.backward()
