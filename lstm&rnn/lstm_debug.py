@@ -134,9 +134,17 @@ def grad_check(self, eps, thresh):
     self.thresh = thresh
 
     # add eps to all weights
+    # self._W = self.W + self.eps
+    # self._V = self.V + self.eps
+    # self._R = self.R + self.eps
+
     self.W = self.W + self.eps
     self.V = self.V + self.eps
     self.R = self.R + self.eps
+
+    # lol = self._W - self.W
+    # kek = self._R - self.R
+    # lok = self._V - self.V
     #call forward() to make forward pass
     lossPlusEps = self.forward(self.x,self.y)
 
