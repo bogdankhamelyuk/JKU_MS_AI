@@ -30,7 +30,7 @@ class DroneThrmImg_Dataset(Dataset):
         
 
     def __len__(self):
-        return self.samples_number # return required number of samples, since that's exactly length of the each dataset
+        return self.req_samples_number # return required number of samples, since that's exactly length of the each dataset
 
     def __getitem__(self, idx):
         video_number = DroneThrmImg_Dataset.test_file_name[idx] # take out random generated number of the video, according to its index
