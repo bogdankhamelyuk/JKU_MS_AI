@@ -1,30 +1,37 @@
-import torch, os, random, json
+import torch, torchvision, os, random, json
 from torch.utils.data import Dataset, DataLoader
+
+path = os.getcwd() + "/computer_vision/labels/"
+
+def count_all_jsons(): 
+    total_json_number = 0
+    for file in os.listdir(path):
+        if file.endswith('.json'):
+            total_json_number+=1
+    return total_json_number
 
 class DroneThrmImg_Dataset(Dataset):
     # create arrays, where random and non-repeating numbers of videos in the working directory will be stored 
     train_file_names, test_file_names = [], [] 
     random.seed(10)
     path = os.getcwd() + "/computer_vision/labels/"
-    total_samples_number = 0
 
     def __init__(self,req_samples_number, dataset_type):
+        self.dataset_type = dataset_type
+        self.total_json_number = count_all_jsons()
         
-        if DroneThrmImg_Dataset.total_samples_number == 0: # if total number of labeled videos in json form hasn't counted yet
-            DroneThrmImg_Dataset.count_all_jsons() # calculate using class method count_all_jsons()
-        
-        if req_samples_number < DroneThrmImg_Dataset.total_samples_number:
+        if req_samples_number < self.total_json_number:
             self.req_samples_number = req_samples_number # number of samples required for training/test dataset and is less than total number of samples
         else:
             raise IndexError(f"required samples number ({req_samples_number}) is greater than\
- total number of available samples({DroneThrmImg_Dataset.total_samples_number})")
+ total number of available samples({self.total_json_number})")
         
-        if dataset_type == 'TEST':
-            DroneThrmImg_Dataset.append_random_number(DroneThrmImg_Dataset.test_file_names,self.req_samples_number)
-        
-        elif dataset_type == 'TRAIN':
-            DroneThrmImg_Dataset.append_random_number(DroneThrmImg_Dataset.train_file_names,self.req_samples_number)
-        
+        if self.dataset_type == 'TEST':
+            self.append_random_number(DroneThrmImg_Dataset.test_file_names,self.req_samples_number)
+            
+        elif self.dataset_type == 'TRAIN':
+            self.append_random_number(DroneThrmImg_Dataset.train_file_names,self.req_samples_number)
+
         else:
             raise NameError(f"'{dataset_type}' is not in the list of available dataset types. \nAvailable types are: 'TEST' and 'TRAIN.")
         
@@ -33,6 +40,13 @@ class DroneThrmImg_Dataset(Dataset):
         return self.req_samples_number # return required number of samples, since that's exactly length of the each dataset
 
     def __getitem__(self, idx):
+        # ToDo: do it with instance list instead of if conditons
+        if self.dataset_type == 'TEST':
+            video_number = DroneThrmImg_Dataset.test_file_name[idx]
+        
+        if self.dataset_type == 'TRAIN':
+            video_number = DroneThrmImg_Dataset.train_file_name[idx]
+
         video_number = DroneThrmImg_Dataset.test_file_name[idx] # take out random generated number of the video, according to its index
         video_name = "video_" + str(video_number) + ".json" # append this number to "video_" and ".json", like all other videos are named
         video_path = DroneThrmImg_Dataset.path+video_name # create complete path to the indexed video, i.e. "labels" of that video
@@ -54,29 +68,30 @@ class DroneThrmImg_Dataset(Dataset):
                 grid[int(row)][int(column)][2]=y # y-coordinate of the label
             video_labels["labels"].append(grid) # append that 16x16x3 gridded frame to the labels
         video_labels["labels"] = torch.stack(video_labels["labels"]) # convert labels to the torch-type tensor
-        return video_labels
+        return video_labels # ToDo: tuple containing 1)gelesenes video itself(look how2do using pytorch), 2)labeled frames & 3)augmented (use another class?)
 
-    @classmethod        
-    def append_random_number(cls, optional_list, samples_number):
+            
+    def append_random_number(self, optional_list, samples_number):
         i = 0
         while i < samples_number:
-            # substract 1 from total_samples_number, because the first video is named using 0, not 1, 
+            # substract 1 from total_json_number, because the first video is named using 0, not 1, 
             # so the number of the last video is 1 less then total quantity
-            r = random.randint(0,DroneThrmImg_Dataset.total_samples_number-1) 
+            r = random.randint(0,self.total_json_number-1) 
             if not r in DroneThrmImg_Dataset.train_file_names \
                         and not r in DroneThrmImg_Dataset.test_file_names:
                 optional_list.append(r)
                 i+=1
 
-    @classmethod 
-    def count_all_jsons(cls):
-        for file in os.listdir(DroneThrmImg_Dataset.path):
-            if file.endswith('.json'):
-                DroneThrmImg_Dataset.total_samples_number+=1
          
 
-train_dataset = DroneThrmImg_Dataset(req_samples_number=20, dataset_type='TRAIN')
-test_dataset = DroneThrmImg_Dataset(req_samples_number=7,  dataset_type='TEST')
+all_files = count_all_jsons()
+train_files = int(0.8*all_files)
+test_files = int(0.2*all_files)
+
+test_dataset = DroneThrmImg_Dataset(req_samples_number=train_files,  dataset_type='TEST')
+train_dataset = DroneThrmImg_Dataset(req_samples_number=test_files, dataset_type='TRAIN')
+
 
 train_dataloader = DataLoader(train_dataset,shuffle=True)
 test_dataloader = DataLoader(test_dataset, shuffle=True)
+
