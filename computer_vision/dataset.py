@@ -1,5 +1,7 @@
 import torch, torchvision, os, random, json
 from torch.utils.data import Dataset, DataLoader
+import cv2 
+import numpy as np 
 
 path = os.getcwd() + "/computer_vision/labels/"
 
@@ -45,10 +47,16 @@ class DroneThrmImg_Dataset(Dataset):
         label_path = path+label_name # create complete path to the indexed video, i.e. "labels" of that video
         labels = open(file=label_path, mode="r")
         labels_json = json.load(labels)[str(video_number)] # adjust output of the json using [str(video_number)], to access labels
-        video_tensor = torchvision.io.read_video(path+video_name)
-        video_tensor = torchvision.io.read_video(path+video_name)[0] # create video tensor for the output
-        shape = video_tensor.shape
+        video_tensor = torchvision.io.read_video(path+video_name)[0] # create video tensor for the output, which shape 
+        
+        # T,H,W,C = video_tensor.size()
+        # 0,1,2,3
 
+        gray_video_tensor = video_tensor.narrow(-1,0,1)
+        #print(gray_video_tensor.size())
+        gray_video_tensor = torch.permute(gray_video_tensor,(0,3,1,2))
+        #print(gray_video_tensor.size())
+    
         output = {"video_tensor":video_tensor, "labels":[]} # create output return dictionary containing video name and labels for each frame
 
         for labeled_frame in labels_json: # each labeled frame in json has number of recogn. people and their coordinates, i.e. coordinates of label
