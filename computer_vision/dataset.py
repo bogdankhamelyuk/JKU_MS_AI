@@ -55,10 +55,9 @@ class DroneThrmImg_Dataset(Dataset):
         gray_video_tensor = video_tensor.narrow(-1,0,1)
         #print(gray_video_tensor.size())
         gray_video_tensor = torch.permute(gray_video_tensor,(0,3,1,2))
-        #print(gray_video_tensor.size())
+        print(gray_video_tensor.size())
     
-        output = {"video_tensor":video_tensor, "labels":[]} # create output return dictionary containing video name and labels for each frame
-
+        labels = []
         for labeled_frame in labels_json: # each labeled frame in json has number of recogn. people and their coordinates, i.e. coordinates of label
             # create 16x16x3 grid, in each position of which is
             # the prob-ty of recognition and x,y-coordinates of the label to be stored
@@ -70,18 +69,19 @@ class DroneThrmImg_Dataset(Dataset):
                 grid[int(row)][int(column)][0]=1 # probability that in this grid is person, make it to 100%
                 grid[int(row)][int(column)][1]=x # x-coordinate of the label
                 grid[int(row)][int(column)][2]=y # y-coordinate of the label
-            output["labels"].append(grid) # append that 16x16x3 gridded frame to the labels
-        output["labels"] = torch.stack(output["labels"])#.to(device=) # convert labels to the torch-type tensor
+            labels.append(grid) # append that 16x16x3 gridded frame to the labels
+        labels = torch.stack(labels)#.to(device=) # convert labels to the torch-type tensor
+        print(labels.size())
         if torch.backends.mps.is_available():
-            output["video_tensor"] = output["video_tensor"].to("mps")
-            output["labels"] = output["labels"].to("mps")
+            gray_video_tensor = gray_video_tensor.to("mps")
+            labels = labels.to("mps")
         elif torch.backends.cuda.is_available():
-            output["video_tensor"] = output["video_tensor"].to("cuda")
-            output["labels"] = output["labels"].to("cuda")
+            gray_video_tensor = gray_video_tensor.to("cuda")
+            labels = labels.to("cuda")
         else:
             print("Warning!\nNo hardware support is found. All tensors are on CPU\n")
-        #print(output["labels"].shape)
-        return output 
+        
+        return gray_video_tensor, labels 
 
             
     def append_random_number(self, optional_list, samples_number):
@@ -109,5 +109,9 @@ train_dataset = DroneThrmImg_Dataset(req_samples_number=train_files, dataset_typ
 train_dataloader = DataLoader(train_dataset,shuffle=True)
 test_dataloader = DataLoader(test_dataset, shuffle=True)
 
-output = next(iter(train_dataloader))
+for i, batch in enumerate(iter(train_dataloader)):
+    video, label = batch
+    video = video[0]
+    label = label[0]
+ 
 
