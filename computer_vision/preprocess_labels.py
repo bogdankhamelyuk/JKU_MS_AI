@@ -8,14 +8,17 @@ Original file is located at
 """
 
 
-import cv2
 import requests
 import ndjson
 import json
 import os
+import numpy as np
+import time
 
 
 from labelbox import Client
+
+start = time.time()
 API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbGJ0bWV6aHQ5eW5vMDgxMDFvcTUyc3QxIiwib3JnYW5pemF0aW9uSWQiOiJjbGJ0bWV6ZmI5eW5uMDgxMGduZGk2OXZtIiwiYXBpS2V5SWQiOiJjbGJ1c2w1eW4ydDRlMDgwbDd6dHYyaTFkIiwic2VjcmV0IjoiNDhiMGYxYTI5NzZiMzFmODFhMmQwMjdhMzQ2ZGFhYTgiLCJpYXQiOjE2NzE0NTQwNTMsImV4cCI6MjMwMjYwNjA1M30.byH8m7_7qZZCxO3SHY14JIS_Xer0JPy5i-WH16DJ5jM"
 client = Client(api_key=API_KEY)
 project = client.get_project('clbtwzgas9u4g070i4kr26byi')
@@ -24,14 +27,36 @@ export_url = project.export_labels()
 
 print(export_url)
 
+
 exports = requests.get(export_url).json()
 
-exports[-1]
+for video in exports:
+    video_name = video["External ID"].split(".")[0]
 
-annotations_url = exports[0]["Label"]["frames"]
-print(annotations_url)
+    print(f"started video {video_name}")
+    
+    labeled_video_url = video["Label"]["frames"]
+    
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    labeled_video = ndjson.loads(requests.get(labeled_video_url, headers=headers).text)
+    
+    label_frames = []
+    for frame in labeled_video:
+        objects_list = []
+        for objects in frame['objects']:
+            x_abs = objects['point']['x']
+            y_abs = objects['point']['y']
+            objects_list.append({"x": x_abs,"y":y_abs})
+        label_frames.append(objects_list)
 
-headers = {"Authorization": f"Bearer {API_KEY}"}
-annotations = ndjson.loads(requests.get(annotations_url, headers=headers).text)
+    
+    video_name+=".json"
+    path = os.getcwd() + "/computer_vision/labels/"
+    path+=video_name
+    with open(file=path,mode="w+") as json_file:
+        json.dump(label_frames,json_file,indent=4)
 
-annotations[-1]
+
+end = time.time()
+diff = end - start
+print("used time: ", diff)
