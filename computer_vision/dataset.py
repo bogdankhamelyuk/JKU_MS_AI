@@ -1,9 +1,15 @@
 import torch, torchvision, os, random, json
 from torch.utils.data import Dataset, DataLoader
-import cv2 
-import numpy as np 
+from torchsummary import summary
 
 path = os.getcwd() + "/computer_vision/labels/"
+
+if torch.backends.mps.is_available():
+    device = "mps"
+elif torch.backends.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
 
 def count_all_jsons(): 
     total_json_number = 0
@@ -52,7 +58,7 @@ class DroneThrmImg_Dataset(Dataset):
         # T,H,W,C = video_tensor.size()
         # 0,1,2,3
 
-        gray_video_tensor = video_tensor.narrow(-1,0,1)
+        gray_video_tensor = video_tensor.narrow(-1,0,1) # narrow last dimension(=channels) to 1
         #print(gray_video_tensor.size())
         gray_video_tensor = torch.permute(gray_video_tensor,(0,3,1,2))
         print(gray_video_tensor.size())
@@ -72,15 +78,12 @@ class DroneThrmImg_Dataset(Dataset):
             labels.append(grid) # append that 16x16x3 gridded frame to the labels
         labels = torch.stack(labels)#.to(device=) # convert labels to the torch-type tensor
         print(labels.size())
-        if torch.backends.mps.is_available():
-            gray_video_tensor = gray_video_tensor.to("mps")
-            labels = labels.to("mps")
-        elif torch.backends.cuda.is_available():
-            gray_video_tensor = gray_video_tensor.to("cuda")
-            labels = labels.to("cuda")
-        else:
-            print("Warning!\nNo hardware support is found. All tensors are on CPU\n")
+
+        labels = labels.to(device).to(torch.float32)
+        gray_video_tensor = gray_video_tensor.to(device).to(torch.float32)
         
+        print(gray_video_tensor.dtype)
+        print(labels.dtype)
         return gray_video_tensor, labels 
 
             
@@ -109,9 +112,105 @@ train_dataset = DroneThrmImg_Dataset(req_samples_number=train_files, dataset_typ
 train_dataloader = DataLoader(train_dataset,shuffle=True)
 test_dataloader = DataLoader(test_dataset, shuffle=True)
 
+
+class myCNN:
+    def __init__(self, input_channels):
+        self.input_channels = input_channels
+
+        self.model = torch.nn.Sequential(
+            self.network()
+        ).to(device)
+        
+        self.loss_fn = torch.nn.BCELoss()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr= 1e-3)
+        
+    def get_model(self):
+        return self.model, self.loss_fn, self.optimizer
+
+    def network(self):
+        return torch.nn.Sequential(
+            torch.nn.Conv2d(1,32, kernel_size=(7,11),stride=1), # = 250,310
+            torch.nn.Conv2d(32,64, kernel_size=11,stride=2), # 120,150
+            torch.nn.MaxPool2d(3), # 40,50
+            torch.nn.Conv2d(64,128,kernel_size=2,stride=2), # 20,25
+            torch.nn.Conv2d(128,128,kernel_size=(5,10),stride=1), # 16,16
+            torch.nn.ReLU(), # 16,16
+            torch.nn.Flatten(start_dim=0),
+            torch.nn.Linear(32768,16*16*3),
+            torch.nn.Sigmoid()
+    )
+    
+    def get_train_data(self):
+        train_dataloader = DataLoader(train_dataset,shuffle=True)
+        return train_dataloader
+    def get_test_data(self):
+        test_dataloader = DataLoader(test_dataset,shuffle=True)
+        return test_dataloader
+
+
+my_cnn = myCNN(1)
+model, loss, optimizer = my_cnn.get_model()
+
+
+video, label = next(iter(my_cnn.get_train_data()))
+video = video[0][0]
+label = label[0][0]
+
+print(torch.flatten(label).shape)
+# summary(model.to(device), video.shape)
+torch.flatten(label)
+print(label.shape)
 for i, batch in enumerate(iter(train_dataloader)):
     video, label = batch
     video = video[0]
     label = label[0]
- 
+    print(label.shape)
 
+    print(label.get_device())
+    print(label.get_device())
+    for frame, labeled_frame in zip(video,label):
+        # print(frame.shape)
+        # print(labeled_frame.shape)
+        # print(torch.flatten(labeled_frame).shape)
+        pass
+
+    conv1 = torch.nn.Conv2d(1,32, kernel_size=(7,11),stride=1).to(device)  # = 250,310
+    conv2 = torch.nn.Conv2d(32,64, kernel_size=11,stride=2).to(device)  # 120,150
+    pool  = torch.nn.MaxPool2d(3).to(device) # 40,50
+    conv3 = torch.nn.Conv2d(64,128,kernel_size=2,stride=2).to(device) # 20,25
+    conv4   = torch.nn.Conv2d(128,128,kernel_size=(5,10),stride=1).to(device) # 16,16
+    relu    =  torch.nn.ReLU().to(device) # 16,16
+    flatten = torch.nn.Flatten(start_dim=0).to(device)
+    
+    linear = torch.nn.Linear(32768,16*16*3).to(device)
+    sigmoid = torch.nn.Sigmoid().to(device)
+    for frame in video:
+        print(frame.shape)
+
+        x = conv1(frame)
+        print(x.shape)
+       
+        x = conv2(x)
+        print(x.shape)
+        
+        
+
+        x = pool(x)
+        print("pool: ",x.shape)
+
+        x = conv3(x)
+        print(x.shape)
+        
+        x = conv4(x)
+        print(x.shape)
+        x = relu(x)
+        x = flatten(x)
+  
+        print("flatten: ", x.size())
+       
+       
+        x = linear(x)
+        x = sigmoid(x)
+        print("linear: ",x.shape)
+
+       
