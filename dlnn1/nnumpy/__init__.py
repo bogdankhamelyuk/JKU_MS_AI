@@ -297,9 +297,7 @@ class Module:
         the values that are necessary for gradient computation automagically.
         """
         self._shape_cache.append(tuple(np.shape(x) for x in inputs))
-        values = self.compute_outputs(*inputs)
-        #print(values.shape)
-        out, cache = values
+        out, cache = self.compute_outputs(*inputs)
         self._forward_cache.append(cache)
         return out
 
